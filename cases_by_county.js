@@ -11,17 +11,16 @@ const margin = {
 
 
 const width = 1200 - margin.left - margin.right;
-const height = 550 - margin.top - margin.bottom;
+const height = 610 - margin.top - margin.bottom;
 
 var projection = d3.geoAlbersUsa()
-
-
-// .translate([width / 2, height / 2]) // translate to center of screen
-// .scale([1000]); // scale things down so see entire US
+.scale([1100]) // scale things down so see entire US
+.translate([width / 2, height / 2]) // translate to center of screen
 
 // Define path generator
 var path = d3.geoPath()
     .projection(projection);
+    // .scale(1000);
 
 var svg = d3.select("body")
     .append("svg")
@@ -74,11 +73,11 @@ let usData =
         // console.log(data[2].filter(function(d,i){ return topojson.feature(d, d.objects.states).features.id.has(posmap.keys())} ))
         console.log(data)
         var a = topojson.feature(data[2], data[2].objects.counties).features
-        .filter(function(d, i) {
-            return posmap.has(d.id)
-        })
-        .sort(function(a, b) { return posmap.get(a.properties.id) - posmap.get(a.properties.id) })
-        
+            .filter(function(d, i) {
+                return posmap.has(d.id)
+            })
+            .sort(function(a, b) { return posmap.get(a.properties.id) - posmap.get(a.properties.id) })
+
         console.log(a)
         svg.selectAll('path')
             .attr('class', 'states')
@@ -95,6 +94,7 @@ let usData =
             .style('fill', "#ccc")
 
 
+
         svg.append("g")
             .attr("class", "bubble")
             .selectAll("circle")
@@ -106,10 +106,29 @@ let usData =
             })
             .attr("r", function(d) {
                 return radius_pos(posmap.get(d.id))
-                // radius_pos(posmap.get(d.properties.id)) ? radius_pos(posmap.get(d.properties.id)) : 1 
             })
-            .style('opacity', '0.5')
-            .style('fill', 'orange');
+        // .style('opacity', '0.5')
+        // .style('fill', 'orange');
+        svg.append('g')
+            .attr('class', 'State Legend')
+            .selectAll('text')
+            .data(topojson.feature(data[2], data[2].objects.states).features.filter(function(d, i) {
+                // ids above 56 are several US territories like Guam , and Puetro Rico
+                return !(d.id > 56)
+            }))
+            .enter()
+            .append('text')
+            .attr('dx', function(d) {
+                return path.centroid(d)[0]  
+            })
+            .attr('dy', function(d) {
+                console.log(d)
+                return path.centroid(d)[1]
+            })
+            .text(function(d) { return d.properties.name })
+            .style('align', 'left')
+            .style('vertical-align', 'middle')
+            .style('font-size', 10)
     })
 
 
