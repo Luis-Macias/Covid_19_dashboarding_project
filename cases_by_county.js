@@ -64,7 +64,7 @@ let county_data = d3.csv('data/us-counties.csv', function(d) {
 
 })
 
-let radius_pos = d3.scaleSqrt().range([5, 50])
+let radius_pos = d3.scaleSqrt().range([1, 50])
 let max_cases = county_data.then(d => d3.extent(d.map(d => d.cases))).then(d => radius_pos.domain(d))
 
 // loading in the TOPOJSON file
