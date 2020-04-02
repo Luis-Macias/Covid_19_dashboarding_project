@@ -28,7 +28,7 @@ var svg = d3.select("body")
     .attr("width", width)
     .attr("height", height)
 
-var radius_pos = d3.scaleSqrt().range([5, 50]);
+// var radius_pos = d3.scaleSqrt().range([5, 50]);
 let posmap = d3.map();
 
 let totalmap = d3.map();
@@ -48,7 +48,7 @@ let percapmap = d3.map();
 let time_parse = d3.timeParse("%Y-%m-%d")
 
 let county_data = d3.csv('data/us-counties.csv', function(d) {
-    // console.log(d)
+    posmap.set(d.fips, +d.cases)
     return {
         date: time_parse(d.date),
         county: d.county,
@@ -61,11 +61,69 @@ let county_data = d3.csv('data/us-counties.csv', function(d) {
     return data.filter(function(d, i) {
         return d.date.getTime() === time_parse('2020-03-27').getTime();
     });
+
 })
 
+let radius_pos = d3.scaleSqrt().range([5, 50])
+let max_cases = county_data.then(d => d3.extent(d.map(d => d.cases))).then(d => radius_pos.domain(d))
 
-// let temp1 = county_data.filter(d => d.date < time_parse('2020-03-27'))
+// loading in the TOPOJSON file
+let usData =
+    Promise.all([county_data, max_cases, d3.json('data/counties-10m.json')])
+    .then(function(data) {
+        // console.log(data[2].filter(function(d,i){ return topojson.feature(d, d.objects.states).features.id.has(posmap.keys())} ))
+        console.log(data)
+        var a = topojson.feature(data[2], data[2].objects.counties).features
+        .filter(function(d, i) {
+            return posmap.has(d.id)
+        })
+        .sort(function(a, b) { return posmap.get(a.properties.id) - posmap.get(a.properties.id) })
+        
+        console.log(a)
+        svg.selectAll('path')
+            .attr('class', 'states')
+            // .data(data[2],function(data){return data[2].filter(function(d,i){ return topojson.feature(d, d.objects.states).features.id.has(posmap.keys())} )})
+            .data(topojson.feature(data[2], data[2].objects.states).features)
+            .enter()
+            // .merge(posmap)
+            // .exit()
+            // .remove()
+            .append('path')
+            .attr('d', path)
+            .style("stroke", "#fff")
+            .style("stroke-width", "1")
+            .style('fill', "#ccc")
+
+
+        svg.append("g")
+            .attr("class", "bubble")
+            .selectAll("circle")
+            .data(a)
+            .enter()
+            .append("circle")
+            .attr("transform", function(d) {
+                return "translate(" + path.centroid(d) + ")";
+            })
+            .attr("r", function(d) {
+                return radius_pos(posmap.get(d.id))
+                // radius_pos(posmap.get(d.properties.id)) ? radius_pos(posmap.get(d.properties.id)) : 1 
+            })
+            .style('opacity', '0.5')
+            .style('fill', 'orange');
+    })
+
+
+
+// let temp1 = counties_data.filter(d => d.date < time_parse('2020-03-27'))
 // let temp2 = d3.csv('data/us-counties.csv')
 // .then(function(data){
 //     console.log(data)
 // })
+
+// var temp = d3.json('data/counties-10m.json').then(function(data) {
+//     // console.log(topojson.feature(data,data.objects.county).features)
+//     // return data.sort(function(a, b) { return posmap.get(a.properties.id) - posmap.get(a.properties.id) }) 
+//     temp1.filter(function(d, i) {
+//         return topojson.feature(d, d.objects.counties).features.id.includes(posmap.keys())
+//     })
+// }).catch(error => console.log(error))
