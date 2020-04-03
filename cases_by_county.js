@@ -37,7 +37,7 @@
      .attr("height", height)
 
  // creating our radius scale 
- var radius_pos = d3.scaleSqrt().range([5, 50]);
+ var radius_pos = d3.scaleSqrt().range([1, 50]);
 
  // parsing the string of dates to convert to Date objects
  let time_parse = d3.timeParse("%Y-%m-%d")
@@ -108,13 +108,14 @@
          
          
          console.log(data[0][0])
-         svg.append("g")
+         var circles =  svg.append("g")
              .attr("class", "bubble")
              .selectAll("circle")
-             .data(data[0][0], d => d.values)
+             .data(data[0][0].values)
              .enter()
              .append("circle")
-             .attr("transform", function(d) {
+             console.log(circles)
+        circles.attr("transform", function(d) {
                  console.log(d)
                  return "translate(" + path.centroid(data[3].get(d.fips)) + ")";
              })
