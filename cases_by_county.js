@@ -24,6 +24,8 @@
  var projection = d3.geoAlbersUsa()
  // .scale([1100]) // scale things down so see entire US
  // .translate([width / 2, height / 2]) // translate to center of screen
+ // creating a transition 
+ var t = d3.transition().duration(250).ease(d3.easeLinear)
 
  // Define path generator
  var path = d3.geoPath()
@@ -37,7 +39,7 @@
      .attr("height", height)
 
  // creating our radius scale 
- var radius_pos = d3.scaleSqrt().range([1, 50]);
+ var radius_pos = d3.scaleSqrt().range([0, 50]);
 
  // parsing the string of dates to convert to Date objects
  let time_parse = d3.timeParse("%Y-%m-%d")
@@ -71,80 +73,82 @@
 
  // max cases is a promise that when resolved should update the domain of our radius scale
  let max_cases = covid_by_county.then(d => d[d.length - 1])
-     .then(d => d3.extent(d.values.map(d => +d['cases'])))
-     .then(d => radius_pos.domain(d))
+     .then(d => d3.max(d.values.map(d => +d['cases'])))
+     .then(d => radius_pos.domain([0,d]))
 
  // loading in TOPOJSON data
  let county_topo = d3.json('data/counties-10m.json')
  // creating a map of counties
- let county_map = county_topo.then( us => new Map(
-    topojson.feature(us, us.objects.counties).features.map(d => [d.id, d])))
+ let county_map = county_topo.then(us => new Map(
+     topojson.feature(us, us.objects.counties).features.map(d => [d.id, d])))
 
 
- let chart = Promise.all([covid_by_county, max_cases,county_topo,county_map ])
-     .then(function(data) {
-         // console log our promises for debugging/ sanity checking
-         console.log(data)
-         console.log(data[0])
+ function chart() {
+     Promise.all([covid_by_county, max_cases, county_topo, county_map])
+         .then(function(data) {
+             // console log our promises for debugging/ sanity checking
+             console.log(data)
+             var a = data[0]
+             // creating nation borders !
+             svg.append('path')
+                 // .data(data[2],function(data){return data[2].filter(function(d,i){ return topojson.feature(d, d.objects.states).features.id.has(posmap.keys())} )})
+                 .datum(topojson.feature(data[2], data[2].objects.nation))
+                 // .enter()
+                 .attr('d', path)
+                 .attr('class', 'nation')
+                 .style('fill', "#ccc")
 
-         svg.append('path')
-             // .data(data[2],function(data){return data[2].filter(function(d,i){ return topojson.feature(d, d.objects.states).features.id.has(posmap.keys())} )})
-             .datum(topojson.feature(data[2], data[2].objects.nation))
-             // .enter()
-             .attr('d', path)
-             .attr('class', 'nation')
-             // .style("stroke", "#fff")
-             // .style("stroke-width", "1")
-             .style('fill', "#ccc")
+             // creating state borders
+             svg.append('path')
+                 .datum(topojson.mesh(data[2], data[2].objects.states, function(a, b) { return a !== b; }))
+                 // .enter()
+                 .attr("class", "border ")
+                 .attr('d', path)
 
 
-         svg.append('path')
-             .datum(topojson.mesh(data[2], data[2].objects.states, function(a, b) { return a !== b; }))
-             // .enter()
-             .attr("class", "border ")
-             .attr('d', path)
 
 
-         
-         
-         console.log(data[0][0])
-         var circles =  svg.append("g")
-             .attr("class", "bubble")
-             .selectAll("circle")
-             .data(data[0][0].values)
-             .enter()
-             .append("circle")
+             // creating county centroids
+             var circles = svg.append("g")
+                 .attr("class", "bubble")
+                 .selectAll("circle")
+                 .data(a[a.length - 1].values)
+                 .enter()
+                 .append("circle")
+             // 
              console.log(circles)
-        circles.attr("transform", function(d) {
-                 console.log(d)
+
+             circles.attr("transform", function(d) {
                  return "translate(" + path.centroid(data[3].get(d.fips)) + ")";
              })
-             .attr("r", function(d) {
-                 return radius_pos(+d.cases)
-             })
-         // .style('opacity', '0.5')
-         // .style('fill', 'orange');
-         svg.append('g')
-             .attr('class', 'State Legend')
-             .selectAll('text')
-             .data(topojson.feature(data[2], data[2].objects.states).features.filter(function(d, i) {
-                 // ids above 56 are several US territories like Guam , and Puetro Rico
-                 return !(d.id > 56)
-             }))
-             .enter()
-             .append('text')
-             .attr('dx', function(d) {
-                 return path.centroid(d)[0] - 10
-             })
-             .attr('dy', function(d) {
-                 // console.log(d)
-                 return path.centroid(d)[1]
-             })
-             .text(function(d) { return d.properties.name })
-             .style('align', 'left')
-             .style('vertical-align', 'middle')
-             .style('font-size', 10)
-     })
+             // .attr("r", function(d) {
+             //     return radius_pos(+d.cases)
+             // })
+
+             // creat state labels
+             svg.append('g')
+                 .attr('class', 'State Legend')
+                 .selectAll('text')
+                 .data(topojson.feature(data[2], data[2].objects.states).features.filter(function(d, i) {
+                     // ids above 56 are several US territories like Guam , and Puetro Rico
+                     return !(d.id > 56)
+                 }))
+                 .enter()
+                 .append('text')
+                 .attr('dx', function(d) {
+                     return path.centroid(d)[0] - 10
+                 })
+                 .attr('dy', function(d) {
+                     // console.log(d)
+                     return path.centroid(d)[1]
+                 })
+                 .text(function(d) { return d.properties.name })
+                 .style('align', 'left')
+                 .style('vertical-align', 'middle')
+                 .style('font-size', 10)
+         }).catch(function(error) { console.log(error) })
+ }
+ chart()
 
 
 
@@ -163,25 +167,25 @@
  // }).catch(error => console.log(error))
 
  // console.log(data[2].filter(function(d,i){ return topojson.feature(d, d.objects.states).features.id.has(posmap.keys())} ))
- // var tooltip = d3.select('body')
- //     .append('div')
- // // source code from Mike Bostock 
- // // can be found at <insert link here >
- // // I've modfied it to be able to do similar 
+ var tooltip = d3.select('body')
+     .append('div')
+ // source code from Mike Bostock 
+ // can be found at <insert link here >
+ // I've modfied it to be able to do similar 
 
- // var startDate = time_parse("2020-03-00"); //YYYY-MM-DD
- // var endDate = time_parse("2020-03-27"); //YYYY-MM-DD
+ var startDate = time_parse("2020-03-00"); //YYYY-MM-DD
+ var endDate = time_parse("2020-03-27"); //YYYY-MM-DD
 
- // var getDateArray = function(start, end) {
- //     var arr = new Array();
- //     var dt = new Date(start);
- //     while (dt <= end) {
- //         console.log(dt)
- //         arr.push(new Date(dt));
- //         dt.setDate(dt.getDate() + 1);
- //     }
- //     return arr;
- // }
+ var getDateArray = function(start, end) {
+     var arr = new Array();
+     var dt = new Date(start);
+     while (dt <= end) {
+         console.log(dt)
+         arr.push(new Date(dt));
+         dt.setDate(dt.getDate() + 1);
+     }
+     return arr;
+ }
 
  // var dateArr = getDateArray(startDate, endDate);
  // console.log(dateArr)
@@ -255,3 +259,43 @@
      else stop();
      return form.o.value
  }
+
+ async function update_chart(index) {
+
+     let result = await Promise.all([covid_by_county, county_map])
+     let circles = svg.select('g').selectAll('circle')
+
+
+     console.log(result)
+     console.log(circles)
+     console.log(result[0][index].values)
+
+     circles
+         .data(result[0][index].values)
+         .join(
+             enter => enter.append("circle")
+             .attr("transform", function(d) {
+                 return "translate(" + path.centroid(result[1].get(d.fips)) + ")";
+             })
+             .attr("r", function(d) {
+                 return radius_pos(+d.cases)
+             }),
+
+             update => update.attr("transform", function(d) {
+                 return "translate(" + path.centroid(result[1].get(d.fips)) + ")";
+             })
+             .attr("r", function(d) {
+                 return radius_pos(+d.cases)
+             }),
+
+             exit => exit.attr("r", d => radius_pos(0)).call(
+                 exit => exit.transition()
+                 .attr("r", d => radius_pos(0))
+             )
+
+         )
+ };
+
+ update_chart(20)
+
+
