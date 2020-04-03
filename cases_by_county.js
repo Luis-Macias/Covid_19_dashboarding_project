@@ -42,11 +42,8 @@
  // parsing the string of dates to convert to Date objects
  let time_parse = d3.timeParse("%Y-%m-%d")
 
-let coor_map = new Map();
-
- // loading our county data and parsing them 
-
- let county_data = d3.csv('data/us-counties.csv'
+ // loading our covid data and parsing them 
+ let covid_by_county = d3.csv('data/us-counties.csv'
      // building our map of cases to their fips code
      // posmap.set(d.fips, +d.cases)
      // {
@@ -73,23 +70,22 @@ let coor_map = new Map();
 
 
  // max cases is a promise that when resolved should update the domain of our radius scale
- let max_cases = county_data.then(d => d[d.length - 1])
+ let max_cases = covid_by_county.then(d => d[d.length - 1])
      .then(d => d3.extent(d.values.map(d => +d['cases'])))
      .then(d => radius_pos.domain(d))
 
  // loading in TOPOJSON data
  let county_topo = d3.json('data/counties-10m.json')
  // creating a map of counties
- let county_map = topo.then( us => new Map(
+ let county_map = county_topo.then( us => new Map(
     topojson.feature(us, us.objects.counties).features.map(d => [d.id, d])))
 
 
- let usData = Promise.all([county_data, max_cases,county_features, county_topo)])
+ let chart = Promise.all([covid_by_county, max_cases,county_topo,county_map ])
      .then(function(data) {
          // console log our promises for debugging/ sanity checking
          console.log(data)
-         console.log(topojson.feature(data[2], data[2].objects.nation).features)
-
+         console.log(data[0])
 
          svg.append('path')
              // .data(data[2],function(data){return data[2].filter(function(d,i){ return topojson.feature(d, d.objects.states).features.id.has(posmap.keys())} )})
@@ -109,25 +105,21 @@ let coor_map = new Map();
              .attr('d', path)
 
 
-         // a is filtered 
-         // let a = topojson.feature(data[2], data[2].objects.counties).features
-         //     .filter(function(d, i) {
-         //         return posmap.has(d.id)
-         //     })
-             // .sort(function(a, b) { return posmap.get(a.properties.id) - posmap.get(a.properties.id) })
-         var a = [1,2,3]
-         console.log()
+         
+         
+         console.log(data[0][0])
          svg.append("g")
              .attr("class", "bubble")
              .selectAll("circle")
-             .data(a)
+             .data(data[0][0], d => d.values)
              .enter()
              .append("circle")
              .attr("transform", function(d) {
-                 return "translate(" + path.centroid(d) + ")";
+                 console.log(d)
+                 return "translate(" + path.centroid(data[3].get(d.fips)) + ")";
              })
              .attr("r", function(d) {
-                 return radius_pos(posmap.get(d.id))
+                 return radius_pos(+d.cases)
              })
          // .style('opacity', '0.5')
          // .style('fill', 'orange');
