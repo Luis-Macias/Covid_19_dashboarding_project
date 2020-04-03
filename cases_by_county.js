@@ -1,9 +1,8 @@
  // sanity checking 
- console.log("hello world")
  'use strict';
- import {Scrubber as scrub} from './modules/scrubber.js';
- console.log(scrub)
- console.log(scrub)
+ console.log("hello world")
+ // import { scrubber } from './modules/scrubber.js';
+
  // defining our margins 
  const margin = {
      top: 30,
@@ -37,53 +36,55 @@
      .attr("width", width)
      .attr("height", height)
 
- // var radius_pos = d3.scaleSqrt().range([5, 50]);
- // creating 3 mappings of states and their positive cases , total population and cases per capita
- let posmap = d3.map();
- // let totalmap = d3.map();
- // let percapmap = d3.map();
+ // creating our radius scale 
+ var radius_pos = d3.scaleSqrt().range([5, 50]);
 
- // url to the dataset that NYTimes is currently using for their cornonavirus dashboard 
- // var county_cases = "https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv"
- // var county_totals = {}
- // let county_total_pop = d3.csv('./data/state_total_pop.csv', function(d) {
- //         state_totals[d.abrev] = {
- //             state: d.states,
- //             population: +d.total
- //         }
- //     }
-
- // )
  // parsing the string of dates to convert to Date objects
  let time_parse = d3.timeParse("%Y-%m-%d")
 
+let coor_map = new Map();
+
  // loading our county data and parsing them 
- let county_data = d3.csv('data/us-counties.csv', function(d) {
+
+ let county_data = d3.csv('data/us-counties.csv'
      // building our map of cases to their fips code
-     posmap.set(d.fips, +d.cases)
-     return {
-         date: time_parse(d.date),
-         county: d.county,
-         state: d.state,
-         fips: d.fips,
-         cases: +d.cases,
-         deaths: +d.deaths
-     }
- }).then(function(data) {
+     // posmap.set(d.fips, +d.cases)
+     // {
+     //     date: time_parse(d.date),
+     //     county: d.county,
+     //     state: d.state,
+     //     fips: d.fips,
+     //     cases: +d.cases,
+     //     deaths: +d.deaths
+     // }
+
+ ).then(function(data) {
      // filtering the above data to be a specific data for practice
-     return data.filter(function(d, i) {
-         return d.date.getTime() === time_parse('2020-03-27').getTime();
-     });
+     return d3.nest()
+         .key(function(d) {
+             return d.date
+         }).sortKeys(d3.ascending)
+         .entries(data.filter(d => time_parse(d.date).getTime() >= time_parse('2020-03-01').getTime()))
+     //     return data.filter(function(d, i) {
+     //         return d.date.getTime() === time_parse('2020-03-27').getTime();
+     //     });
 
  })
 
- // creating our radius scale 
- let radius_pos = d3.scaleSqrt().range([1, 50])
- // max cases is a promise that when resolved should update the domain of our radius scale
- let max_cases = county_data.then(d => d3.extent(d.map(d => d.cases))).then(d => radius_pos.domain(d))
 
- // loading in the TOPOJSON file and waiting for other promises to resolve before creating map
- let usData = Promise.all([county_data, max_cases, d3.json('data/counties-10m.json')])
+ // max cases is a promise that when resolved should update the domain of our radius scale
+ let max_cases = county_data.then(d => d[d.length - 1])
+     .then(d => d3.extent(d.values.map(d => +d['cases'])))
+     .then(d => radius_pos.domain(d))
+
+ // loading in TOPOJSON data
+ let county_topo = d3.json('data/counties-10m.json')
+ // creating a map of counties
+ let county_map = topo.then( us => new Map(
+    topojson.feature(us, us.objects.counties).features.map(d => [d.id, d])))
+
+
+ let usData = Promise.all([county_data, max_cases,county_features, county_topo)])
      .then(function(data) {
          // console log our promises for debugging/ sanity checking
          console.log(data)
@@ -109,12 +110,13 @@
 
 
          // a is filtered 
-         let a = topojson.feature(data[2], data[2].objects.counties).features
-             .filter(function(d, i) {
-                 return posmap.has(d.id)
-             })
-             .sort(function(a, b) { return posmap.get(a.properties.id) - posmap.get(a.properties.id) })
-         console.log(a)
+         // let a = topojson.feature(data[2], data[2].objects.counties).features
+         //     .filter(function(d, i) {
+         //         return posmap.has(d.id)
+         //     })
+             // .sort(function(a, b) { return posmap.get(a.properties.id) - posmap.get(a.properties.id) })
+         var a = [1,2,3]
+         console.log()
          svg.append("g")
              .attr("class", "bubble")
              .selectAll("circle")
@@ -151,7 +153,7 @@
              .style('font-size', 10)
      })
 
-var day = scurb([1,2])
+
 
  // let temp1 = counties_data.filter(d => d.date < time_parse('2020-03-27'))
  // let temp2 = d3.csv('data/us-counties.csv')
@@ -168,62 +170,95 @@ var day = scurb([1,2])
  // }).catch(error => console.log(error))
 
  // console.log(data[2].filter(function(d,i){ return topojson.feature(d, d.objects.states).features.id.has(posmap.keys())} ))
-tooltip = d3.select('body')
-    .append('div')
+ // var tooltip = d3.select('body')
+ //     .append('div')
+ // // source code from Mike Bostock 
+ // // can be found at <insert link here >
+ // // I've modfied it to be able to do similar 
 
- function Scrubber(values, {
-  format = value => value,
-  delay = null,
-  autoplay = true,
-  loop = true,
-  alternate = false,
-  initial = 0
-} = {}) {
-  values = Array.from(values);
-  const form = html`<form style="font: 12px var(--sans-serif); display: flex; height: 33px; align-items: center;">
-  <button name=b type=button style="margin-right: 0.4em; width: 5em;"></button>
-  <label style="display: flex; align-items: center;">
-    <input name=i type=range min=0 max=${values.length - 1} value=${initial} step=1 style="width: 180px;">
-    <output name=o style="margin-left: 0.4em;"></output>
-  </label>
-</form>`;
-  let timer = null;
-  let direction = 1;
-  function start() {
-    form.b.textContent = "Pause";
-    timer = delay === null
-      ? requestAnimationFrame(tick)
-      : setInterval(tick, delay);
-  }
-  function stop() {
-    form.b.textContent = "Play";
-    if (delay === null) cancelAnimationFrame(timer);
-    else clearInterval(timer);
-    timer = null;
-  }
-  function tick() {
-    if (delay === null) timer = requestAnimationFrame(tick);
-    if (form.i.valueAsNumber === (direction > 0 ? values.length - 1 : direction < 0 ? 0 : NaN)) {
-      if (!loop) return stop();
-      if (alternate) direction = -direction;
-    }
-    form.i.valueAsNumber = (form.i.valueAsNumber + direction + values.length) % values.length;
-    form.i.dispatchEvent(new CustomEvent("input", {bubbles: true}));
-  }
-  form.i.oninput = event => {
-    if (event && event.isTrusted && timer) form.b.onclick();
-    form.value = values[form.i.valueAsNumber];
-    form.o.value = format(form.value, form.i.valueAsNumber, values);
-  };
-  form.b.onclick = () => {
-    if (timer) return stop();
-    direction = alternate && form.i.valueAsNumber === values.length - 1 ? -1 : 1;
-    form.i.valueAsNumber = (form.i.valueAsNumber + direction) % values.length;
-    form.i.dispatchEvent(new CustomEvent("input", {bubbles: true}));
-    start();
-  };
-  form.i.oninput();
-  if (autoplay) start();
-  else stop();
-  return Generators.disposable(form, stop);
-}
+ // var startDate = time_parse("2020-03-00"); //YYYY-MM-DD
+ // var endDate = time_parse("2020-03-27"); //YYYY-MM-DD
+
+ // var getDateArray = function(start, end) {
+ //     var arr = new Array();
+ //     var dt = new Date(start);
+ //     while (dt <= end) {
+ //         console.log(dt)
+ //         arr.push(new Date(dt));
+ //         dt.setDate(dt.getDate() + 1);
+ //     }
+ //     return arr;
+ // }
+
+ // var dateArr = getDateArray(startDate, endDate);
+ // console.log(dateArr)
+ // var years = scrubber(dateArr,tooltip,{
+ //   delay: 500,
+ //   loop: false,
+ //   format: d => d.toLocaleDateString()
+ // })
+ // console.log(years)
+ function scrubber(values, container, {
+     format = value => value,
+     delay = null,
+     autoplay = true,
+     loop = true,
+     alternate = false,
+     initial = 0
+ } = {}) {
+     values = Array.from(values);
+     // let container = document.createElement('div');
+     container.html(`<form style="font: 12px var(--sans-serif); display: flex; height: 33px; align-items: center;">
+    <button name=b type=button style="margin-right: 0.4em; width: 5em;"></button>
+    <label style="display: flex; align-items: center;">
+      <input name=i type=range min=0 max=${values.length - 1} value=${initial} step=1 style="width: 180px;">
+      <output name=o style="margin-left: 0.4em;"></output>
+    </label>
+  </form>`)
+     const form = document.querySelector('form')
+     console.log(form)
+     let timer = null;
+     let direction = 1;
+
+     function start() {
+         form.b.textContent = "Pause";
+         timer = delay === null ?
+             requestAnimationFrame(tick) :
+             setInterval(tick, delay);
+     }
+
+     function stop() {
+         form.b.textContent = "Play";
+         if (delay === null) cancelAnimationFrame(timer);
+         else clearInterval(timer);
+         timer = null;
+     }
+
+     function tick() {
+         if (delay === null) timer = requestAnimationFrame(tick);
+         if (form.i.valueAsNumber === (direction > 0 ? values.length - 1 : direction < 0 ? 0 : NaN)) {
+             if (!loop) return stop();
+             if (alternate) direction = -direction;
+         }
+         form.i.valueAsNumber = (form.i.valueAsNumber + direction + values.length) % values.length;
+         form.i.dispatchEvent(new CustomEvent("input", { bubbles: true }));
+     }
+     form.i.oninput = event => {
+         console.log("on input")
+         if (event && event.isTrusted && timer) form.b.onclick();
+         form.value = values[form.i.valueAsNumber];
+         form.o.value = format(form.value, form.i.valueAsNumber, values);
+     };
+     form.b.onclick = () => {
+         console.log('on click')
+         if (timer) return stop();
+         direction = alternate && form.i.valueAsNumber === values.length - 1 ? -1 : 1;
+         form.i.valueAsNumber = (form.i.valueAsNumber + direction) % values.length;
+         form.i.dispatchEvent(new CustomEvent("input", { bubbles: true }));
+         start();
+     };
+     form.i.oninput();
+     if (autoplay) start();
+     else stop();
+     return form.o.value
+ }
