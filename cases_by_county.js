@@ -1,148 +1,229 @@
-var h1 = d3.select('body')
-    .append('h1') // making a new div svg element 
-    .text("U.S COVID-19 Positive Cases by County")
+ // sanity checking 
+ console.log("hello world")
+ 'use strict';
+ import {Scrubber as scrub} from './modules/scrubber.js';
+ console.log(scrub)
+ console.log(scrub)
+ // defining our margins 
+ const margin = {
+     top: 30,
+     right: 30,
+     bottom: 30,
+     left: 20
+ };
 
-const margin = {
-    top: 30,
-    right: 30,
-    bottom: 30,
-    left: 20
-};
+ // creating our width and height from the svg 
+ const width = 1200 - margin.left - margin.right;
+ const height = 610 - margin.top - margin.bottom;
+
+ // giving our dashboard a header
+ var h1 = d3.select('body')
+     .append('h1')
+     .text("U.S COVID-19 Positive Cases by County")
+
+ // creating a porjection function that takes coordinates and projects them on a 2d plane in this case its of the us states 
+ var projection = d3.geoAlbersUsa()
+ // .scale([1100]) // scale things down so see entire US
+ // .translate([width / 2, height / 2]) // translate to center of screen
+
+ // Define path generator
+ var path = d3.geoPath()
+     .projection(projection);
+ // .scale(1000);
+
+ // creating our svg element that will we draw on 
+ var svg = d3.select("body")
+     .append("svg")
+     .attr("width", width)
+     .attr("height", height)
+
+ // var radius_pos = d3.scaleSqrt().range([5, 50]);
+ // creating 3 mappings of states and their positive cases , total population and cases per capita
+ let posmap = d3.map();
+ // let totalmap = d3.map();
+ // let percapmap = d3.map();
+
+ // url to the dataset that NYTimes is currently using for their cornonavirus dashboard 
+ // var county_cases = "https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv"
+ // var county_totals = {}
+ // let county_total_pop = d3.csv('./data/state_total_pop.csv', function(d) {
+ //         state_totals[d.abrev] = {
+ //             state: d.states,
+ //             population: +d.total
+ //         }
+ //     }
+
+ // )
+ // parsing the string of dates to convert to Date objects
+ let time_parse = d3.timeParse("%Y-%m-%d")
+
+ // loading our county data and parsing them 
+ let county_data = d3.csv('data/us-counties.csv', function(d) {
+     // building our map of cases to their fips code
+     posmap.set(d.fips, +d.cases)
+     return {
+         date: time_parse(d.date),
+         county: d.county,
+         state: d.state,
+         fips: d.fips,
+         cases: +d.cases,
+         deaths: +d.deaths
+     }
+ }).then(function(data) {
+     // filtering the above data to be a specific data for practice
+     return data.filter(function(d, i) {
+         return d.date.getTime() === time_parse('2020-03-27').getTime();
+     });
+
+ })
+
+ // creating our radius scale 
+ let radius_pos = d3.scaleSqrt().range([1, 50])
+ // max cases is a promise that when resolved should update the domain of our radius scale
+ let max_cases = county_data.then(d => d3.extent(d.map(d => d.cases))).then(d => radius_pos.domain(d))
+
+ // loading in the TOPOJSON file and waiting for other promises to resolve before creating map
+ let usData = Promise.all([county_data, max_cases, d3.json('data/counties-10m.json')])
+     .then(function(data) {
+         // console log our promises for debugging/ sanity checking
+         console.log(data)
+         console.log(topojson.feature(data[2], data[2].objects.nation).features)
 
 
-const width = 1200 - margin.left - margin.right;
-const height = 610 - margin.top - margin.bottom;
+         svg.append('path')
+             // .data(data[2],function(data){return data[2].filter(function(d,i){ return topojson.feature(d, d.objects.states).features.id.has(posmap.keys())} )})
+             .datum(topojson.feature(data[2], data[2].objects.nation))
+             // .enter()
+             .attr('d', path)
+             .attr('class', 'nation')
+             // .style("stroke", "#fff")
+             // .style("stroke-width", "1")
+             .style('fill', "#ccc")
 
-var projection = d3.geoAlbersUsa()
-.scale([1100]) // scale things down so see entire US
-.translate([width / 2, height / 2]) // translate to center of screen
 
-// Define path generator
-var path = d3.geoPath()
-    .projection(projection);
-    // .scale(1000);
+         svg.append('path')
+             .datum(topojson.mesh(data[2], data[2].objects.states, function(a, b) { return a !== b; }))
+             // .enter()
+             .attr("class", "border ")
+             .attr('d', path)
 
-var svg = d3.select("body")
-    .append("svg")
-    .attr("width", width)
-    .attr("height", height)
 
-// var radius_pos = d3.scaleSqrt().range([5, 50]);
-let posmap = d3.map();
+         // a is filtered 
+         let a = topojson.feature(data[2], data[2].objects.counties).features
+             .filter(function(d, i) {
+                 return posmap.has(d.id)
+             })
+             .sort(function(a, b) { return posmap.get(a.properties.id) - posmap.get(a.properties.id) })
+         console.log(a)
+         svg.append("g")
+             .attr("class", "bubble")
+             .selectAll("circle")
+             .data(a)
+             .enter()
+             .append("circle")
+             .attr("transform", function(d) {
+                 return "translate(" + path.centroid(d) + ")";
+             })
+             .attr("r", function(d) {
+                 return radius_pos(posmap.get(d.id))
+             })
+         // .style('opacity', '0.5')
+         // .style('fill', 'orange');
+         svg.append('g')
+             .attr('class', 'State Legend')
+             .selectAll('text')
+             .data(topojson.feature(data[2], data[2].objects.states).features.filter(function(d, i) {
+                 // ids above 56 are several US territories like Guam , and Puetro Rico
+                 return !(d.id > 56)
+             }))
+             .enter()
+             .append('text')
+             .attr('dx', function(d) {
+                 return path.centroid(d)[0] - 10
+             })
+             .attr('dy', function(d) {
+                 // console.log(d)
+                 return path.centroid(d)[1]
+             })
+             .text(function(d) { return d.properties.name })
+             .style('align', 'left')
+             .style('vertical-align', 'middle')
+             .style('font-size', 10)
+     })
 
-let totalmap = d3.map();
-let percapmap = d3.map();
+var day = scurb([1,2])
 
-// url to the dataset that NYTimes is currently using for their cornonavirus dashboard 
-// var county_cases = "https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv"
-// var county_totals = {}
-// let county_total_pop = d3.csv('./data/state_total_pop.csv', function(d) {
-//         state_totals[d.abrev] = {
-//             state: d.states,
-//             population: +d.total
-//         }
-//     }
+ // let temp1 = counties_data.filter(d => d.date < time_parse('2020-03-27'))
+ // let temp2 = d3.csv('data/us-counties.csv')
+ // .then(function(data){
+ //     console.log(data)
+ // })
 
-// )
-let time_parse = d3.timeParse("%Y-%m-%d")
+ // var temp = d3.json('data/counties-10m.json').then(function(data) {
+ //     // console.log(topojson.feature(data,data.objects.county).features)
+ //     // return data.sort(function(a, b) { return posmap.get(a.properties.id) - posmap.get(a.properties.id) }) 
+ //     temp1.filter(function(d, i) {
+ //         return topojson.feature(d, d.objects.counties).features.id.includes(posmap.keys())
+ //     })
+ // }).catch(error => console.log(error))
 
-let county_data = d3.csv('data/us-counties.csv', function(d) {
-    posmap.set(d.fips, +d.cases)
-    return {
-        date: time_parse(d.date),
-        county: d.county,
-        state: d.state,
-        fips: d.fips,
-        cases: +d.cases,
-        deaths: +d.deaths
+ // console.log(data[2].filter(function(d,i){ return topojson.feature(d, d.objects.states).features.id.has(posmap.keys())} ))
+tooltip = d3.select('body')
+    .append('div')
+
+ function Scrubber(values, {
+  format = value => value,
+  delay = null,
+  autoplay = true,
+  loop = true,
+  alternate = false,
+  initial = 0
+} = {}) {
+  values = Array.from(values);
+  const form = html`<form style="font: 12px var(--sans-serif); display: flex; height: 33px; align-items: center;">
+  <button name=b type=button style="margin-right: 0.4em; width: 5em;"></button>
+  <label style="display: flex; align-items: center;">
+    <input name=i type=range min=0 max=${values.length - 1} value=${initial} step=1 style="width: 180px;">
+    <output name=o style="margin-left: 0.4em;"></output>
+  </label>
+</form>`;
+  let timer = null;
+  let direction = 1;
+  function start() {
+    form.b.textContent = "Pause";
+    timer = delay === null
+      ? requestAnimationFrame(tick)
+      : setInterval(tick, delay);
+  }
+  function stop() {
+    form.b.textContent = "Play";
+    if (delay === null) cancelAnimationFrame(timer);
+    else clearInterval(timer);
+    timer = null;
+  }
+  function tick() {
+    if (delay === null) timer = requestAnimationFrame(tick);
+    if (form.i.valueAsNumber === (direction > 0 ? values.length - 1 : direction < 0 ? 0 : NaN)) {
+      if (!loop) return stop();
+      if (alternate) direction = -direction;
     }
-}).then(function(data) {
-    return data.filter(function(d, i) {
-        return d.date.getTime() === time_parse('2020-03-27').getTime();
-    });
-
-})
-
-let radius_pos = d3.scaleSqrt().range([1, 50])
-let max_cases = county_data.then(d => d3.extent(d.map(d => d.cases))).then(d => radius_pos.domain(d))
-
-// loading in the TOPOJSON file
-let usData =
-    Promise.all([county_data, max_cases, d3.json('data/counties-10m.json')])
-    .then(function(data) {
-        // console.log(data[2].filter(function(d,i){ return topojson.feature(d, d.objects.states).features.id.has(posmap.keys())} ))
-        console.log(data)
-        var a = topojson.feature(data[2], data[2].objects.counties).features
-            .filter(function(d, i) {
-                return posmap.has(d.id)
-            })
-            .sort(function(a, b) { return posmap.get(a.properties.id) - posmap.get(a.properties.id) })
-
-        console.log(a)
-        svg.selectAll('path')
-            .attr('class', 'states')
-            // .data(data[2],function(data){return data[2].filter(function(d,i){ return topojson.feature(d, d.objects.states).features.id.has(posmap.keys())} )})
-            .data(topojson.feature(data[2], data[2].objects.states).features)
-            .enter()
-            // .merge(posmap)
-            // .exit()
-            // .remove()
-            .append('path')
-            .attr('d', path)
-            .style("stroke", "#fff")
-            .style("stroke-width", "1")
-            .style('fill', "#ccc")
-
-
-
-        svg.append("g")
-            .attr("class", "bubble")
-            .selectAll("circle")
-            .data(a)
-            .enter()
-            .append("circle")
-            .attr("transform", function(d) {
-                return "translate(" + path.centroid(d) + ")";
-            })
-            .attr("r", function(d) {
-                return radius_pos(posmap.get(d.id))
-            })
-        // .style('opacity', '0.5')
-        // .style('fill', 'orange');
-        svg.append('g')
-            .attr('class', 'State Legend')
-            .selectAll('text')
-            .data(topojson.feature(data[2], data[2].objects.states).features.filter(function(d, i) {
-                // ids above 56 are several US territories like Guam , and Puetro Rico
-                return !(d.id > 56)
-            }))
-            .enter()
-            .append('text')
-            .attr('dx', function(d) {
-                return path.centroid(d)[0]  
-            })
-            .attr('dy', function(d) {
-                console.log(d)
-                return path.centroid(d)[1]
-            })
-            .text(function(d) { return d.properties.name })
-            .style('align', 'left')
-            .style('vertical-align', 'middle')
-            .style('font-size', 10)
-    })
-
-
-
-// let temp1 = counties_data.filter(d => d.date < time_parse('2020-03-27'))
-// let temp2 = d3.csv('data/us-counties.csv')
-// .then(function(data){
-//     console.log(data)
-// })
-
-// var temp = d3.json('data/counties-10m.json').then(function(data) {
-//     // console.log(topojson.feature(data,data.objects.county).features)
-//     // return data.sort(function(a, b) { return posmap.get(a.properties.id) - posmap.get(a.properties.id) }) 
-//     temp1.filter(function(d, i) {
-//         return topojson.feature(d, d.objects.counties).features.id.includes(posmap.keys())
-//     })
-// }).catch(error => console.log(error))
+    form.i.valueAsNumber = (form.i.valueAsNumber + direction + values.length) % values.length;
+    form.i.dispatchEvent(new CustomEvent("input", {bubbles: true}));
+  }
+  form.i.oninput = event => {
+    if (event && event.isTrusted && timer) form.b.onclick();
+    form.value = values[form.i.valueAsNumber];
+    form.o.value = format(form.value, form.i.valueAsNumber, values);
+  };
+  form.b.onclick = () => {
+    if (timer) return stop();
+    direction = alternate && form.i.valueAsNumber === values.length - 1 ? -1 : 1;
+    form.i.valueAsNumber = (form.i.valueAsNumber + direction) % values.length;
+    form.i.dispatchEvent(new CustomEvent("input", {bubbles: true}));
+    start();
+  };
+  form.i.oninput();
+  if (autoplay) start();
+  else stop();
+  return Generators.disposable(form, stop);
+}
