@@ -71,7 +71,7 @@ let county_map = county_topo.then(us => new Map(
 // loading our covid data and parsing them 
 let get_clean_data = async() => {
     var mappings = await state_map;
-    var data = d3.csv('https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv', function (d) {
+    var data = d3.csv('./data/us_counties.csv', function (d) {
 
         if (d['county'] === 'New York City') {
             d['fips'] = '36061'
