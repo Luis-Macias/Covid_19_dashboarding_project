@@ -1,4 +1,7 @@
 /*main.css*/
+/*svg{
+    border-block: 1px;
+}*/
 g.bubble {
   stroke: orange;
   fill-opacity: .5;
@@ -19,9 +22,7 @@ border: 1px solid #cf1111;
 .tooltip {
     position: absolute;
     display: none;
-
    background: none repeat scroll 0 0 #f0f0f0;
-    /*border: 0 none;*/
     border-radius:6px;
     color: black;
     font: 12px sans-serif;
