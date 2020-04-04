@@ -41,6 +41,12 @@ var svg = d3.select("body")
     .attr("height", height)
     .style('border', '1px solid black');
 
+// var container_2 = svg.append('g')
+//     .attr("width", width / 2)
+//     .attr("height", height / 2)
+//     .attr("transform", `translate(${width + margin.right} ,${height + margin.top}) `)
+//     .style('border', '1px solid black');
+
 
 var form_container = d3.select('body')
     .append('div');
@@ -240,7 +246,7 @@ async function update_chart(index) {
 
         )
         .on('mouseover', function(d) {
-            tooltip.html(`${this.__data__.county}  County:  ${this.__data__.cases}  cases` )
+            tooltip.html(`${this.__data__.county}  County:  ${this.__data__.cases}  cases`)
             tooltip.style("display", "inline");
             tooltip.style("left", d3.event.pageX + 15 + "px")
             tooltip.style("top", d3.event.pageY - 30 + "px")
@@ -342,10 +348,22 @@ async function form_maker() {
 form_maker()
 
 
-// function measure(index){
-// var t0 = performance.now()
+var cv = d3.csv('./data/us_counties.csv', function(d) {
+    // our preprocssed data should have include NYC's fips code but we leave this in in case of data being obtained from the url
+    if (d['county'] === 'New York City') {
+        d['fips'] = '36061'
+    }
+    return d;
+}).then(function(data) {
 
-// update_chart(index)   // <---- The function you're measuring time for 
-
-// var t1 = performance.now()
-// console.log("Call to doSomething took " + (t1 - t0) + " milliseconds.")}
+    return d3.nest().key(function(d) {
+        return d.date
+    }).rollup(function(v) {
+        return {
+            total_cases: d3.sum(v, function(d){return d['cases']}),
+            total_deaths: d3.sum(v, function(d){return d['deaths']})
+        }
+    }).entries(data.filter(
+        d => time_parse(d.date).getTime() >= time_parse('2020-03-01').getTime()
+    ))
+}).catch(error => console.log(error))
