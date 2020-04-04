@@ -3,6 +3,14 @@
  console.log("hello world")
  // import { scrubber } from './modules/scrubber.js';
 
+ function getLocation(d) {
+     let location = countyMap.get(d.fips);
+     if (!location && d.county === "New York City")
+         location = countyMap.get("36061");
+     if (!location) location = stateMap.get(d.state);
+     if (!location) console.warn("No location found for: " + JSON.stringify(d));
+     return location;
+ }
  // defining our margins 
  const margin = {
      top: 30,
@@ -44,47 +52,58 @@
  // parsing the string of dates to convert to Date objects
  let time_parse = d3.timeParse("%Y-%m-%d")
 
- // loading our covid data and parsing them 
- let covid_by_county = d3.csv('data/us-counties.csv'
-     // building our map of cases to their fips code
-     // posmap.set(d.fips, +d.cases)
-     // {
-     //     date: time_parse(d.date),
-     //     county: d.county,
-     //     state: d.state,
-     //     fips: d.fips,
-     //     cases: +d.cases,
-     //     deaths: +d.deaths
-     // }
-
- ).then(function(data) {
-     // filtering the above data to be a specific data for practice
-     return d3.nest()
-         .key(function(d) {
-             return d.date
-         }).sortKeys(d3.ascending)
-         .entries(data.filter(d => time_parse(d.date).getTime() >= time_parse('2020-03-01').getTime()))
-     //     return data.filter(function(d, i) {
-     //         return d.date.getTime() === time_parse('2020-03-27').getTime();
-     //     });
-
- })
-
-
- // max cases is a promise that when resolved should update the domain of our radius scale
- let max_cases = covid_by_county.then(d => d[d.length - 1])
-     .then(d => d3.max(d.values.map(d => +d['cases'])))
-     .then(d => radius_pos.domain([0,d]))
-
  // loading in TOPOJSON data
  let county_topo = d3.json('data/counties-10m.json')
+
+
+ let state_map = county_topo.then(us => new Map(
+     topojson.feature(us, us.objects.states).features.filter(function(d, i) {
+         // ids above 56 are several US territories like Guam , and Puetro Rico
+         return !(d.id > 56)
+     }).map(d => [d.properties.name, d])))
+
+
  // creating a map of counties
  let county_map = county_topo.then(us => new Map(
      topojson.feature(us, us.objects.counties).features.map(d => [d.id, d])))
 
 
+ // loading our covid data and parsing them 
+ let get_clean_data = async () => {
+     var mappings = await state_map;
+     var data = d3.csv('data/us-counties.csv', function(d) {
+
+             if (d['county'] === 'New York City') {
+                 d['fips'] = '36061'
+             }
+             return d
+         }
+     ).then(function(data) {
+         // filtering the above data to be a specific data for practice
+         return d3.nest()
+             .key(function(d) {
+                 return d.date
+             }).sortKeys(d3.ascending)
+             .entries(
+                data.filter(d => time_parse(d.date).getTime() >= time_parse('2020-03-01').getTime())
+                .filter(d => mappings.has(d.state))
+                )
+      
+
+     })
+     return data
+ }
+ let covid_by_county = get_clean_data();
+
+
+ // max cases is a promise that when resolved should update the domain of our radius scale
+ let max_cases = covid_by_county.then(d => d[d.length - 1])
+     .then(d => d3.max(d.values.map(d => +d['cases'])))
+     .then(d => radius_pos.domain([0, d]))
+
+
  function chart() {
-     Promise.all([covid_by_county, max_cases, county_topo, county_map])
+     Promise.all([covid_by_county, max_cases, county_topo, county_map, state_map])
          .then(function(data) {
              // console log our promises for debugging/ sanity checking
              console.log(data)
@@ -112,14 +131,17 @@
              var circles = svg.append("g")
                  .attr("class", "bubble")
                  .selectAll("circle")
-                 .data(a[a.length - 1].values)
+                 .data(a[a.length - 1].values.sort(function(a,b){return +b.cases - +a.cases} ))
                  .enter()
                  .append("circle")
              // 
              console.log(circles)
 
              circles.attr("transform", function(d) {
-                 return "translate(" + path.centroid(data[3].get(d.fips)) + ")";
+                 var location = data[3].get(d.fips) ? data[3].get(d.fips) : data[4].get(d.state)
+
+                 if (!location) { console.warn("No location found for: " + JSON.stringify(d)) }
+                 return "translate(" + path.centroid(location) + ")";
              })
              // .attr("r", function(d) {
              //     return radius_pos(+d.cases)
@@ -187,13 +209,7 @@
      return arr;
  }
 
- // var dateArr = getDateArray(startDate, endDate);
- // console.log(dateArr)
- // var years = scrubber(dateArr,tooltip,{
- //   delay: 500,
- //   loop: false,
- //   format: d => d.toLocaleDateString()
- // })
+ var dateArr = getDateArray(startDate, endDate);
  // console.log(years)
  function scrubber(values, container, {
      format = value => value,
@@ -241,13 +257,13 @@
          form.i.dispatchEvent(new CustomEvent("input", { bubbles: true }));
      }
      form.i.oninput = event => {
-         console.log("on input")
+         update_chart(form.i.valueAsNumber)
          if (event && event.isTrusted && timer) form.b.onclick();
          form.value = values[form.i.valueAsNumber];
          form.o.value = format(form.value, form.i.valueAsNumber, values);
+
      };
      form.b.onclick = () => {
-         console.log('on click')
          if (timer) return stop();
          direction = alternate && form.i.valueAsNumber === values.length - 1 ? -1 : 1;
          form.i.valueAsNumber = (form.i.valueAsNumber + direction) % values.length;
@@ -262,27 +278,27 @@
 
  async function update_chart(index) {
 
-     let result = await Promise.all([covid_by_county, county_map])
+     let result = await Promise.all([covid_by_county, county_map, state_map])
      let circles = svg.select('g').selectAll('circle')
 
-
      console.log(result)
-     console.log(circles)
-     console.log(result[0][index].values)
-
      circles
-         .data(result[0][index].values)
+         .data(result[0][index].values.sort(function(a,b){return +b.cases - +a.cases}))
          .join(
              enter => enter.append("circle")
              .attr("transform", function(d) {
-                 return "translate(" + path.centroid(result[1].get(d.fips)) + ")";
+                 var location = result[1].get(d.fips) ? result[1].get(d.fips) : result[2].get(d.state)
+                 if (!location) { console.warn("No location found for: " + JSON.stringify(d)) }
+                 return "translate(" + path.centroid(location) + ")";
              })
              .attr("r", function(d) {
                  return radius_pos(+d.cases)
              }),
 
              update => update.attr("transform", function(d) {
-                 return "translate(" + path.centroid(result[1].get(d.fips)) + ")";
+                 var location = result[1].get(d.fips) ? result[1].get(d.fips) : result[2].get(d.state)
+                 if (!location) { console.warn("No location found for: " + JSON.stringify(d)) }
+                 return "translate(" + path.centroid(location) + ")";
              })
              .attr("r", function(d) {
                  return radius_pos(+d.cases)
@@ -296,6 +312,12 @@
          )
  };
 
- update_chart(20)
+ var years = scrubber(dateArr, tooltip, {
+     delay: 500,
+     autoplay: true,
+     loop: false,
+     format: d => d.toLocaleDateString()
+ })
 
 
+ // update_chart(20)

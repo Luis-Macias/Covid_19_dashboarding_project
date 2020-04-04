@@ -4,6 +4,7 @@ g.bubble {
   fill-opacity: .5;
   stroke-width: .5px;
   fill: orange;
+border: 1px solid #cf1111;
 }
 .nation {
   fill: #ddd;
