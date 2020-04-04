@@ -9,11 +9,11 @@ const margin = {
     top: 30,
     right: 30,
     bottom: 30,
-    left: 20
+    left: 10
 };
 
 // creating our width and height from the svg 
-const width = 1200 - margin.left - margin.right;
+const width = 960 - margin.left - margin.right;
 const height = 610 - margin.top - margin.bottom;
 
 // giving our dashboard a header
@@ -38,14 +38,16 @@ var path = d3.geoPath()
 var svg = d3.select("body")
     .append("svg")
     .attr("width", width)
-    .attr("height", height);
+    .attr("height", height)
+    .style('border', '1px solid black');
 
-var tooltip = d3.select('body')
-    .append('div');
 
 var form_container = d3.select('body')
     .append('div');
 
+var tooltip = d3.select('body')
+    .append('div')
+    .attr('class', 'tooltip');
 // creating our radius scale 
 var radius_pos = d3.scaleSqrt().range([0, 50]);
 
@@ -184,7 +186,8 @@ function chart() {
                 .style('align', 'left')
                 .style('vertical-align', 'middle')
                 .style('font-size', 10);
-        }).catch(function(error) {
+        })
+        .catch(function(error) {
             console.log(error)
         })
 }
@@ -192,50 +195,59 @@ chart()
 
 // function that updates our county bubbles based on index of array of Dates [march 1 , ... recent date in data]
 async function update_chart(index) {
-// queueing up Promises need to actually update our circles
-let result = await Promise.all([covid_by_county, county_map, state_map])
+    // queueing up Promises need to actually update our circles
+    let result = await Promise.all([covid_by_county, county_map, state_map])
 
-// making a variable of the selection of circles 
-let circles = svg.select('g').selectAll('circle')
+    // making a variable of the selection of circles 
+    let circles = svg.select('g').selectAll('circle')
 
-// joining our updated data and sorting based on descening case count to draw biggger bubles first and smaller bubbles on top   
-result[0][index].values
-circles
-    .data(result[0][index].values.sort(function(a, b) {
-        return +b.cases - +a.cases
-    }), d => d.fips || d.county)
-    // utilizing .jion method to specify what occurs to data being enter updateded and exited
-    .join(
-        enter => enter.append("circle")
-        .attr("transform", function(d) {
-            var location = result[1].get(d.fips) ? result[1].get(d.fips) : result[2].get(d.state)
-            if (!location) {
-                console.warn("No location found for: " + JSON.stringify(d))
-            }
-            return "translate(" + path.centroid(location) + ")";
-        })
-        .attr("r", function(d) {
-            return radius_pos(+d.cases)
-        }),
+    // joining our updated data and sorting based on descening case count to draw biggger bubles first and smaller bubbles on top   
+    result[0][index].values
+    circles
+        .data(result[0][index].values.sort(function(a, b) {
+            return +b.cases - +a.cases
+        }), d => d.fips || d.county)
+        // utilizing .jion method to specify what occurs to data being enter updateded and exited
+        .join(
+            enter => enter.append("circle")
+            .attr("transform", function(d) {
+                var location = result[1].get(d.fips) ? result[1].get(d.fips) : result[2].get(d.state)
+                if (!location) {
+                    console.warn("No location found for: " + JSON.stringify(d))
+                }
+                return "translate(" + path.centroid(location) + ")";
+            })
+            .attr("r", function(d) {
+                return radius_pos(+d.cases)
+            }),
 
-        update => update
-        .attr("transform", function(d) {
-            var location = result[1].get(d.fips) ? result[1].get(d.fips) : result[2].get(d.state)
-            if (!location) {
-                console.warn("No location found for: " + JSON.stringify(d))
-            }
-            return "translate(" + path.centroid(location) + ")";
-        })
-        .attr("r", function(d) {
-            return radius_pos(+d.cases)
-        }),
+            update => update
+            .attr("transform", function(d) {
+                var location = result[1].get(d.fips) ? result[1].get(d.fips) : result[2].get(d.state)
+                if (!location) {
+                    console.warn("No location found for: " + JSON.stringify(d))
+                }
+                return "translate(" + path.centroid(location) + ")";
+            })
+            .attr("r", function(d) {
+                return radius_pos(+d.cases)
+            }),
 
-        exit => exit.attr("r", d => radius_pos(0)).call(
-            exit => exit.transition(t)
-            .attr("r", d => radius_pos(0)).remove()
+            exit => exit.attr("r", d => radius_pos(0)).call(
+                exit => exit.transition(t)
+                .attr("r", d => radius_pos(0)).remove()
+            )
+
         )
-
-    )
+        .on('mouseover', function(d) {
+            tooltip.html(`${this.__data__.county}  County:  ${this.__data__.cases}  cases` )
+            tooltip.style("display", "inline");
+            tooltip.style("left", d3.event.pageX + 15 + "px")
+            tooltip.style("top", d3.event.pageY - 30 + "px")
+        })
+        .on('mouseout', function(d) {
+            tooltip.style('display', 'None')
+        })
 
 };
 
