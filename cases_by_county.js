@@ -27,7 +27,7 @@ var projection = d3.geoAlbersUsa()
 // .translate([width / 2, height / 2]) // translate to center of screen
 
 // making a transition function 
-var t = d3.transition().duration(250).ease(d3.easeLinear)
+var t = d3.transition().duration(0).ease(d3.curveLinear)
 
 // Define path generator
 var path = d3.geoPath()
@@ -416,9 +416,8 @@ cv.then(function(data) {
             .y(function(d) { return yScale(d.value.total_cases) })
         )
 
-    console.log(data[0])
     line_chart
-    .selectAll('circle')
+        .selectAll('circle')
         .data([data[0]])
         .enter()
         .append('circle')
@@ -429,21 +428,15 @@ cv.then(function(data) {
         .attr("cy", function(d) {
             return yScale(d.value.total_cases)
         })
-        .attr("r", 5)
-        .style('fill', 'black')
 })
 async function update_line(index) {
 
     var data = await cv
-    var currline = line_chart.select('path')
-    currline.datum(data.slice(0, index))
-        .attr("d", d3.line()
-            .x(function(d) { return xScale(time_parse(d.key)) })
-            .y(function(d) { return yScale(d.value.total_cases) })
-        )
+
 
     line_chart.select('circle')
-        .data(data[index]).enter()
+        .datum(data[index])
+        .transition(t)
         .attr("cx", function(d) {
             console.log(d)
             return xScale(time_parse(d.key))
@@ -453,5 +446,15 @@ async function update_line(index) {
         })
         .attr("r", 5)
         .style('fill', 'black')
+ var l =line_chart.select('path').node().getTotalLength()
+    
+    line_chart.select('path').datum(data.slice(0, index+1))
+        
+        .transition(t)
+        .attr("d", d3.line().curve(d3.curveLinear)
+            .x(function(d) { return xScale(time_parse(d.key)) })
+            .y(function(d) { return yScale(d.value.total_cases) })
+        )
 
 }
+
