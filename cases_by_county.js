@@ -360,10 +360,41 @@ var cv = d3.csv('./data/us_counties.csv', function(d) {
         return d.date
     }).rollup(function(v) {
         return {
-            total_cases: d3.sum(v, function(d){return d['cases']}),
-            total_deaths: d3.sum(v, function(d){return d['deaths']})
+            total_cases: d3.sum(v, function(d) { return d['cases'] }),
+            total_deaths: d3.sum(v, function(d) { return d['deaths'] })
         }
     }).entries(data.filter(
         d => time_parse(d.date).getTime() >= time_parse('2020-03-01').getTime()
     ))
 }).catch(error => console.log(error))
+
+
+var yScale = d3.scalePow()
+    .exponent(2)
+    .domain([0, 276091])
+    .range([height , 0 ]);
+
+var yAxis = d3.axisLeft().scale(yScale);
+var line_svg_container = d3.select("body")
+    .append("div")
+    .attr('id', 'lineChart')
+    .append('svg')
+    .attr("width", (width) + margin.left + margin.right)
+    .attr("height", (height) + margin.left + margin.right)
+
+var line_chart = line_svg_container.append('g')
+    .attr("transform", `translate(${margin.left+ 40}, ${margin.top -10})`);
+line_chart.append('g').attr('class', 'y-axis').call(yAxis)
+
+var xScale = d3.scaleTime()
+    .domain([time_parse('2020-03-01'), time_parse('2020-04-03')])
+    .range([0 , width -40 ]);
+
+var xAxis = d3.axisBottom().scale(xScale);
+
+line_chart.append('g').attr('class', 'x-axis')
+.attr("transform", `translate(${0}, ${height})`)
+.call(xAxis)
+
+
+
