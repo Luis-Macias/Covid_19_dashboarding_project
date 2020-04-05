@@ -201,6 +201,7 @@ chart()
 
 // function that updates our county bubbles based on index of array of Dates [march 1 , ... recent date in data]
 async function update_chart(index) {
+    update_line(index)
     // queueing up Promises need to actually update our circles
     let result = await Promise.all([covid_by_county, county_map, state_map])
 
@@ -369,12 +370,19 @@ var cv = d3.csv('./data/us_counties.csv', function(d) {
 }).catch(error => console.log(error))
 
 
-var yScale = d3.scalePow()
-    .exponent(2)
-    .domain([0, 276091])
-    .range([height , 0 ]);
+var yScale = d3.scaleLog()
+    .domain([80, 276091])
+    .range([height, 0])
+    // .tickFormat(10, '')
 
-var yAxis = d3.axisLeft().scale(yScale);
+var yAxis = d3.axisLeft().scale(yScale).ticks( 10,',');
+
+var xScale = d3.scaleTime()
+    .domain([time_parse('2020-03-01'), time_parse('2020-04-03')])
+    .range([0, width - 40]);
+
+var xAxis = d3.axisBottom().scale(xScale);
+
 var line_svg_container = d3.select("body")
     .append("div")
     .attr('id', 'lineChart')
@@ -384,17 +392,41 @@ var line_svg_container = d3.select("body")
 
 var line_chart = line_svg_container.append('g')
     .attr("transform", `translate(${margin.left+ 40}, ${margin.top -10})`);
+
+// creating x and y axis
 line_chart.append('g').attr('class', 'y-axis').call(yAxis)
 
-var xScale = d3.scaleTime()
-    .domain([time_parse('2020-03-01'), time_parse('2020-04-03')])
-    .range([0 , width -40 ]);
-
-var xAxis = d3.axisBottom().scale(xScale);
-
 line_chart.append('g').attr('class', 'x-axis')
-.attr("transform", `translate(${0}, ${height})`)
-.call(xAxis)
+    .attr("transform", `translate(${0}, ${height})`)
+    .call(xAxis)
+
+// drawing our line chart 
+
+cv.then(function(data) {
+    line_chart.append("path")
+        .datum(data.slice(0,0))
+        .attr("fill", "none")
+        .attr("stroke", "steelblue")
+        .attr("stroke-width", 1.5)
+        .attr('class', 'totalCases')
+        .attr("d", d3.line()
+            .x(function(d) { return xScale(time_parse(d.key)) })
+            .y(function(d) { 
+                console.log(d.value.total_cases)
+                return yScale(d.value.total_cases) })
+        )
+})
+async function update_line(index){
+
+    var data = await cv
+    var currline = line_chart.select('path')
+    currline.datum(data.slice(0,index))
+            .attr("d", d3.line()
+            .x(function(d) { return xScale(time_parse(d.key)) })
+            .y(function(d) { 
+                console.log(d.value.total_cases)
+                return yScale(d.value.total_cases) })
+        )
 
 
-
+}
