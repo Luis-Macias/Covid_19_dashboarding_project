@@ -272,7 +272,6 @@ function scrubber(values, container, {
     alternate = false,
     initial = 0
 } = {}) {
-    console.log(values)
     values = Array.from(values);
     // let container = document.createElement('div');
     container.html(`<form style="font: 12px var(--sans-serif); display: flex; height: 33px; align-items: center;">
@@ -373,9 +372,10 @@ var cv = d3.csv('./data/us_counties.csv', function(d) {
 var yScale = d3.scaleLog()
     .domain([80, 276091])
     .range([height, 0])
-    // .tickFormat(10, '')
+// .tickFormat(10, '')
 
-var yAxis = d3.axisLeft().scale(yScale).ticks( 10,',');
+
+var yAxis = d3.axisLeft().scale(yScale).ticks(10, ',');
 
 var xScale = d3.scaleTime()
     .domain([time_parse('2020-03-01'), time_parse('2020-04-03')])
@@ -403,30 +403,55 @@ line_chart.append('g').attr('class', 'x-axis')
 // drawing our line chart 
 
 cv.then(function(data) {
-    line_chart.append("path")
-        .datum(data.slice(0,0))
+    var lc = line_chart
+        .append("path")
+
+    lc.datum(data.slice(0, 0))
         .attr("fill", "none")
         .attr("stroke", "steelblue")
         .attr("stroke-width", 1.5)
-        .attr('class', 'totalCases')
+        .attr('class', 'line')
         .attr("d", d3.line()
             .x(function(d) { return xScale(time_parse(d.key)) })
-            .y(function(d) { 
-                console.log(d.value.total_cases)
-                return yScale(d.value.total_cases) })
+            .y(function(d) { return yScale(d.value.total_cases) })
         )
+
+    console.log(data[0])
+    line_chart
+    .selectAll('circle')
+        .data([data[0]])
+        .enter()
+        .append('circle')
+        .attr("cx", function(d) {
+            console.log(d)
+            return xScale(time_parse(d.key))
+        })
+        .attr("cy", function(d) {
+            return yScale(d.value.total_cases)
+        })
+        .attr("r", 5)
+        .style('fill', 'black')
 })
-async function update_line(index){
+async function update_line(index) {
 
     var data = await cv
     var currline = line_chart.select('path')
-    currline.datum(data.slice(0,index))
-            .attr("d", d3.line()
+    currline.datum(data.slice(0, index))
+        .attr("d", d3.line()
             .x(function(d) { return xScale(time_parse(d.key)) })
-            .y(function(d) { 
-                console.log(d.value.total_cases)
-                return yScale(d.value.total_cases) })
+            .y(function(d) { return yScale(d.value.total_cases) })
         )
 
+    line_chart.select('circle')
+        .data(data[index]).enter()
+        .attr("cx", function(d) {
+            console.log(d)
+            return xScale(time_parse(d.key))
+        })
+        .attr("cy", function(d) {
+            return yScale(d.value.total_cases)
+        })
+        .attr("r", 5)
+        .style('fill', 'black')
 
 }
