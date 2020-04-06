@@ -282,7 +282,6 @@ function scrubber(values, container, {
     </label>
   </form>`)
     const form = document.querySelector('form')
-    console.log(form)
     let timer = null;
     let direction = 1;
 
@@ -378,7 +377,7 @@ var yScale = d3.scaleLog()
 var yAxis = d3.axisLeft().scale(yScale).ticks(10, ',');
 
 var xScale = d3.scaleTime()
-    .domain([time_parse('2020-03-01'), time_parse('2020-04-03')])
+    .domain([time_parse('2020-03-01'), time_parse('2020-04-04')])
     .range([0, width - 40]);
 
 var xAxis = d3.axisBottom().scale(xScale);
@@ -406,7 +405,7 @@ cv.then(function(data) {
     var lc = line_chart
         .append("path")
 
-    lc.datum(data.slice(0, 0))
+    lc.datum(data[0])
         .attr("fill", "none")
         .attr("stroke", "steelblue")
         .attr("stroke-width", 1.5)
@@ -421,24 +420,45 @@ cv.then(function(data) {
         .data([data[0]])
         .enter()
         .append('circle')
-        .attr("cx", function(d) {
+        .attr("dx", function(d) {
             console.log(d)
             return xScale(time_parse(d.key))
         })
-        .attr("cy", function(d) {
+        .attr("dy", function(d) {
             return yScale(d.value.total_cases)
         })
+
+    line_chart
+        .append('text')
+        .attr('class', 'pLabel')
+        .datum(data[0])
+        // .enter()
+        // .append('text')
+        .attr("dx", function(d) {
+            console.log(d.value.total_cases)
+            return xScale(time_parse(d.key))
+        })
+        .attr("dy", function(d) {
+            return yScale(d.value.total_cases)
+        })
+        .text(function(d) { return `${d.value.total_cases}` })
+        .attr("text-anchor", "middle")
+        .attr("display", 'none')
+
 })
 async function update_line(index) {
 
     var data = await cv
+
+    // updating circle
+    var b = parseFloat(line_chart.select('.pLabel').node().textContent.replace(/,/g, ''))
 
 
     line_chart.select('circle')
         .datum(data[index])
         .transition(t)
         .attr("cx", function(d) {
-            console.log(d)
+
             return xScale(time_parse(d.key))
         })
         .attr("cy", function(d) {
@@ -446,15 +466,45 @@ async function update_line(index) {
         })
         .attr("r", 5)
         .style('fill', 'black')
- var l =line_chart.select('path').node().getTotalLength()
-    
-    line_chart.select('path').datum(data.slice(0, index+1))
-        
+
+    // updating text
+    function textTween(a, b) {
+        console.log(`old: ${a} \n new: ${b}`)
+        const i =  d3.interpolateNumber(+a, +b);
+        const f = d3.format(",d")
+        return function(t) {
+            console.log(f(i(t)))
+            this.textContent = `${f(i(t))}`;
+        };
+    }
+    line_chart.select('.pLabel')
+        .datum(data[index])
+        .transition(t)
+        .attr("dx", function(d) {
+
+            return xScale(time_parse(d.key)) - 10
+        })
+        .attr("dy", function(d) {
+
+            return yScale(d.value.total_cases) - 10
+        })
+        .tween('text',
+            d => 
+            // console.log([+b , d.value.total_cases])
+            textTween((+b), d.value.total_cases))
+        .attr('display', 'inline')
+
+
+    // .text(d => `${d.value.total_cases}`)
+
+
+    line_chart.select('path').datum(data.slice(0, index + 1))
         .transition(t)
         .attr("d", d3.line().curve(d3.curveLinear)
             .x(function(d) { return xScale(time_parse(d.key)) })
             .y(function(d) { return yScale(d.value.total_cases) })
         )
 
-}
 
+
+}
