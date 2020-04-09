@@ -369,7 +369,7 @@ function scrubber(values, container, {
         }));
         start();
     };
-    // form.i.oninput();
+    form.i.oninput();
     if (autoplay) start();
     else stop();
     return form.o.value
@@ -484,8 +484,7 @@ async function update_line(index) {
         // console.log(`old: ${a} \n new: ${b}`)
         const i = d3.interpolateNumber(+a, +b);
         const f = d3.format(",d")
-        return function(t) {
-            this.textContent = `${f(i(t))}`;
+        return function(t) {            this.textContent = `${f(i(t))}`;
         };
     }
     line_chart.select('.pLabel')
