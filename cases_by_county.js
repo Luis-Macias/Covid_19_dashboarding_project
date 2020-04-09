@@ -36,24 +36,45 @@ var path = d3.geoPath()
 
 // creating our svg view that will we draw on 
 var svg = d3.select("body")
+    .append('div')
+    .attr('id', 'cartogram')
     .append("svg")
     .attr("width", width)
     .attr("height", height)
-    .style('border', '1px solid black');
 
-// var container_2 = svg.append('g')
-//     .attr("width", width / 2)
-//     .attr("height", height / 2)
-//     .attr("transform", `translate(${width + margin.right} ,${height + margin.top}) `)
-//     .style('border', '1px solid black');
+var line_svg_container = d3.select("body")
+    .append("div")
+    .attr('id', 'lineChart')
+    .append('svg')
+    .attr("width", (width / 2) + margin.left + margin.right)
+    .attr("height", (height / 2) + margin.left + margin.right)
+
+var line_chart = line_svg_container.append('g')
+    .attr("transform", `translate(${margin.left+ 40}, ${margin.top -10})`);
+
+var yScale = d3.scaleLog()
+    .range([height/2, 0])
+//     .domain([80, 429283])
+// // .tickFormat(10, '')
+
+
+var yAxis = d3.axisLeft().scale(yScale).ticks(10, ',d');
+
+var xScale = d3.scaleTime()
+    .range([0, (width / 2) - 40]);
+    // .domain([time_parse('2020-03-01'), time_parse('2020-04-08')])
+
+var xAxis = d3.axisBottom().scale(xScale);
+
 
 
 var form_container = d3.select('body')
-    .append('div');
+    .append('div')
+    .attr('id', 'scrubber');
 
 var tooltip = d3.select('body')
     .append('div')
-    .attr('class', 'tooltip');
+    .attr('id', 'tooltip');
 // creating our radius scale 
 var radius_pos = d3.scaleSqrt().range([0, 50]);
 
@@ -75,6 +96,14 @@ let state_map = county_topo.then(us => new Map(
 let county_map = county_topo.then(us => new Map(
     topojson.feature(us, us.objects.counties).features.map(d => [d.id, d])));
 
+var county_data = d3.csv('./data/us_counties.csv', function(d) {
+    // our preprocssed data should have include NYC's fips code but we leave this in in case of data being obtained from the url
+    if (d['county'] === 'New York City') {
+        d['fips'] = '36061'
+    }
+    return d;
+})
+
 
 // loading our covid data that we preprocessed before
 // note we can also use the url https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv to load in the data
@@ -82,13 +111,7 @@ let get_clean_data = async () => {
     // we await for the state_map to complete as we use it for filtering u.s terroritories
     var mappings = await state_map;
 
-    var data = d3.csv('./data/us_counties.csv', function(d) {
-        // our preprocssed data should have include NYC's fips code but we leave this in in case of data being obtained from the url
-        if (d['county'] === 'New York City') {
-            d['fips'] = '36061'
-        }
-        return d;
-    }).then(function(data) {
+    var data = county_data.then(function(data) {
         // reshaping our data into an array of nested objects 
         // keys are dates and values contain county names,  state name,  fips code, # of positive cases , # of deaths 
         // 
@@ -110,6 +133,26 @@ let get_clean_data = async () => {
 }
 
 let covid_by_county = get_clean_data();
+
+var agg_data = d3.csv('./data/us_counties.csv', function(d) {
+    // our preprocssed data should have include NYC's fips code but we leave this in in case of data being obtained from the url
+    if (d['county'] === 'New York City') {
+        d['fips'] = '36061'
+    }
+    return d;
+}).then(function(data) {
+
+    return d3.nest().key(function(d) {
+        return d.date
+    }).rollup(function(v) {
+        return {
+            total_cases: d3.sum(v, function(d) { return d['cases'] }),
+            total_deaths: d3.sum(v, function(d) { return d['deaths'] })
+        }
+    }).entries(data.filter(
+        d => time_parse(d.date).getTime() >= time_parse('2020-03-01').getTime()
+    ))
+}).catch(error => console.log(error))
 
 // max cases is a promise that when resolved should update the domain of our radius scale
 let max_cases = covid_by_county.then(d => d[d.length - 1])
@@ -218,7 +261,7 @@ async function update_chart(index) {
         .join(
             enter => enter.append("circle")
             .attr("transform", function(d) {
-                var location = result[1].get(d.fips) ? result[1].get(d.fips) : result[2].get(d.state)
+                var location = result[1].has(d.fips) ? result[1].get(d.fips) : result[2].get(d.state)
                 if (!location) {
                     console.warn("No location found for: " + JSON.stringify(d))
                 }
@@ -326,7 +369,7 @@ function scrubber(values, container, {
         }));
         start();
     };
-    form.i.oninput();
+    // form.i.oninput();
     if (autoplay) start();
     else stop();
     return form.o.value
@@ -347,61 +390,29 @@ async function form_maker() {
 form_maker()
 
 
-var cv = d3.csv('./data/us_counties.csv', function(d) {
-    // our preprocssed data should have include NYC's fips code but we leave this in in case of data being obtained from the url
-    if (d['county'] === 'New York City') {
-        d['fips'] = '36061'
-    }
-    return d;
-}).then(function(data) {
 
-    return d3.nest().key(function(d) {
-        return d.date
-    }).rollup(function(v) {
-        return {
-            total_cases: d3.sum(v, function(d) { return d['cases'] }),
-            total_deaths: d3.sum(v, function(d) { return d['deaths'] })
-        }
-    }).entries(data.filter(
-        d => time_parse(d.date).getTime() >= time_parse('2020-03-01').getTime()
-    ))
-}).catch(error => console.log(error))
-
-
-var yScale = d3.scaleLog()
-    .domain([80, 276091])
-    .range([height, 0])
-// .tickFormat(10, '')
-
-
-var yAxis = d3.axisLeft().scale(yScale).ticks(10, ',');
-
-var xScale = d3.scaleTime()
-    .domain([time_parse('2020-03-01'), time_parse('2020-04-04')])
-    .range([0, width - 40]);
-
-var xAxis = d3.axisBottom().scale(xScale);
-
-var line_svg_container = d3.select("body")
-    .append("div")
-    .attr('id', 'lineChart')
-    .append('svg')
-    .attr("width", (width) + margin.left + margin.right)
-    .attr("height", (height) + margin.left + margin.right)
-
-var line_chart = line_svg_container.append('g')
-    .attr("transform", `translate(${margin.left+ 40}, ${margin.top -10})`);
 
 // creating x and y axis
-line_chart.append('g').attr('class', 'y-axis').call(yAxis)
 
-line_chart.append('g').attr('class', 'x-axis')
-    .attr("transform", `translate(${0}, ${height})`)
-    .call(xAxis)
+// line_chart.append('g').attr('class', 'y-axis').call(yAxis)
+
 
 // drawing our line chart 
 
-cv.then(function(data) {
+agg_data.then(function(data) {
+    // console.log(data.map(d => time_parse(d.key)))
+    yScale.domain(d3.extent(data , d => d.value.total_cases))
+        // .range([height / 2, 0])
+    xScale.domain(d3.extent(data, d=>time_parse(d.key)))
+
+
+
+    line_chart.append('g').attr('class', 'y-axis').call(yAxis)
+    
+    line_chart.append('g').attr('class', 'x-axis')
+    .attr("transform", `translate(${0}, ${height/2})`)
+    .call(xAxis)
+
     var lc = line_chart
         .append("path")
 
@@ -420,11 +431,11 @@ cv.then(function(data) {
         .data([data[0]])
         .enter()
         .append('circle')
-        .attr("dx", function(d) {
+        .attr("cx", function(d) {
             console.log(d)
             return xScale(time_parse(d.key))
         })
-        .attr("dy", function(d) {
+        .attr("cy", function(d) {
             return yScale(d.value.total_cases)
         })
 
@@ -448,7 +459,7 @@ cv.then(function(data) {
 })
 async function update_line(index) {
 
-    var data = await cv
+    var data = await agg_data
 
     // updating circle
     var b = parseFloat(line_chart.select('.pLabel').node().textContent.replace(/,/g, ''))
@@ -469,11 +480,11 @@ async function update_line(index) {
 
     // updating text
     function textTween(a, b) {
-        console.log(`old: ${a} \n new: ${b}`)
-        const i =  d3.interpolateNumber(+a, +b);
+        // for debugging purposes 
+        // console.log(`old: ${a} \n new: ${b}`)
+        const i = d3.interpolateNumber(+a, +b);
         const f = d3.format(",d")
         return function(t) {
-            console.log(f(i(t)))
             this.textContent = `${f(i(t))}`;
         };
     }
@@ -489,7 +500,7 @@ async function update_line(index) {
             return yScale(d.value.total_cases) - 10
         })
         .tween('text',
-            d => 
+            d =>
             // console.log([+b , d.value.total_cases])
             textTween((+b), d.value.total_cases))
         .attr('display', 'inline')
@@ -498,7 +509,7 @@ async function update_line(index) {
     // .text(d => `${d.value.total_cases}`)
 
 
-    line_chart.select('path').datum(data.slice(0, index + 1))
+    line_chart.select('.line').datum(data.slice(0, index + 1))
         .transition(t)
         .attr("d", d3.line().curve(d3.curveLinear)
             .x(function(d) { return xScale(time_parse(d.key)) })
