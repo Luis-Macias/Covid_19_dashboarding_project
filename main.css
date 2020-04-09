@@ -1,31 +1,45 @@
 /*main.css*/
-/*svg{
-    border-block: 1px;
-}*/
-g.bubble {
-  stroke: orange;
-  fill-opacity: .5;
-  stroke-width: .5px;
-  fill: orange;
-border: 1px solid #cf1111;
+
+#lineChart svg {
+    border: 1px solid black;
+    position: absolute; 
+    /*display: inline-block;*/
+    top:80px;
+    left: 945px;
+    /*right:30px;*/
 }
+#cartogram svg {
+    border: 1px solid black;
+    /*left : 30px;*/
+}
+
+#cartogram g.bubble {
+    stroke: orange;
+    fill-opacity: .5;
+    stroke-width: .5px;
+    fill: orange;
+    border: 1px solid #cf1111;
+}
+
 .nation {
-  fill: #ddd;
+    fill: #ddd;
 }
 
 .border {
-  fill: none;
-  stroke: #fff;
-  stroke-linejoin: round;
-  stroke-linecap: round;
+    fill: none;
+    stroke: #fff;
+    stroke-linejoin: round;
+    stroke-linecap: round;
 }
+
 .tooltip {
     position: absolute;
     display: none;
-   background: none repeat scroll 0 0 #f0f0f0;
-    border-radius:6px;
+    background: none repeat scroll 0 0 #f0f0f0;
+    border-radius: 6px;
     color: black;
     font: 12px sans-serif;
     padding: 5px;
     text-align: center;
 }
+
