@@ -21,7 +21,7 @@ var h1 = d3.select('body')
     .append('h1')
     .text("U.S COVID-19 Positive Cases by County")
 
-// creating a porjection function that takes coordinates and projects them on a 2d plane in this case its of the us states 
+// creating a projection function that takes coordinates and projects them on a 2d plane in this case its of the us states 
 var projection = d3.geoAlbersUsa()
 // .scale([1100]) // scale things down so see entire US
 // .translate([width / 2, height / 2]) // translate to center of screen
@@ -369,7 +369,7 @@ function scrubber(values, container, {
         }));
         start();
     };
-    form.i.oninput();
+    // form.i.oninput();
     if (autoplay) start();
     else stop();
     return form.o.value
