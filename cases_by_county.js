@@ -96,7 +96,7 @@ let state_map = county_topo.then(us => new Map(
 let county_map = county_topo.then(us => new Map(
     topojson.feature(us, us.objects.counties).features.map(d => [d.id, d])));
 
-var county_data = d3.csv('./data/us_counties.csv', function(d) {
+var county_data = d3.csv('https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv', function(d) {
     // our preprocssed data should have include NYC's fips code but we leave this in in case of data being obtained from the url
     if (d['county'] === 'New York City') {
         d['fips'] = '36061'
@@ -134,7 +134,7 @@ let get_clean_data = async () => {
 
 let covid_by_county = get_clean_data();
 
-var agg_data = d3.csv('./data/us_counties.csv', function(d) {
+var agg_data = d3.csv('https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv', function(d) {
     // our preprocssed data should have include NYC's fips code but we leave this in in case of data being obtained from the url
     if (d['county'] === 'New York City') {
         d['fips'] = '36061'
